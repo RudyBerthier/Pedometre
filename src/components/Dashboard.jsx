@@ -19,6 +19,7 @@ export default function Dashboard() {
   const rawDataRef = useRef([]);
   const sessionDataRef = useRef([]); // Stocke toute la session pour l'export
   const lastProcessTimeRef = useRef(0);
+  const lastPeakTimeRef = useRef(0); // Pour ne pas recompter les mêmes pas
 
   // Demande d'autorisation pour iOS 13+
   const requestPermission = async () => {
@@ -48,6 +49,7 @@ export default function Dashboard() {
     setChartData([]);
     rawDataRef.current = [];
     sessionDataRef.current = [];
+    lastPeakTimeRef.current = 0;
     window.addEventListener('devicemotion', handleMotion);
   };
 
@@ -95,8 +97,22 @@ export default function Dashboard() {
     const norms = data.map(d => d.norm);
     const smoothedNorms = smoothSignal(norms, 3);
     
-    // Détection de pas sur les données lissées (pas totalement implémentée ici pour le realtime, on fait du visuel)
+    // Détection de pas sur les données lissées
     const peaks = findPeaks(smoothedNorms, threshold, MIN_DISTANCE);
+    
+    // Comptabiliser les nouveaux pas
+    let newSteps = 0;
+    peaks.forEach(peak => {
+      const peakTime = data[peak.index].time;
+      if (peakTime > lastPeakTimeRef.current) {
+        newSteps++;
+        lastPeakTimeRef.current = peakTime;
+      }
+    });
+
+    if (newSteps > 0) {
+      setStepCount(prev => prev + newSteps);
+    }
     
     // Construire les données pour le graphique (les 50 derniers points)
     const displayData = data.slice(-50).map((d, index) => {
